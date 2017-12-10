@@ -32,10 +32,10 @@ for u in users:
                   r["user"] = data["entry_data"]["ProfilePage"][0]["user"]
                   r['time'] = time.strftime('%b %d, %Y', time.localtime(r['date']))
               all_media.extend(recent_media)
-    except Exception, e:
+    except Exception as e:
       continue
 sorted_media = sorted(all_media, key=itemgetter('date'), reverse=True)
 sorted_media = sorted_media[:200]
 info = {'bits': sorted_media}
 template = Template(read_file('./insta.html'))
-print template.render(info).encode("utf-8")
+print(template.render(info).encode("utf-8"))
