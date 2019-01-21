@@ -1,41 +1,45 @@
-import requests
+import argparse
+import os
 import json
-import time
-from operator import itemgetter
-from jinja2 import Template
-from bs4 import BeautifulSoup
+from requests_html import HTMLSession
+import operator
 
-def read_file(file):
-    with open(file, 'r') as content_file:
-        content = content_file.read()
-    return content
+def get_media(user):
+    
+    url = 'https://www.instagram.com/' + user
+    session = HTMLSession()
+    req = session.get(url)
+    media = []
+    scripts = req.html.xpath('//script[@type]')    
+    for s in scripts:
+        content = s.text
+        if "csrf_token" in content:
+            content = content[:-1].split("window._sharedData = ")[1]      
+            data = json.loads(content)     
+            recent_media = data["entry_data"]["ProfilePage"][0]["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"]
+            for r in recent_media:
+                media.append({
+                    "username": data["entry_data"]["ProfilePage"][0]["graphql"]["user"]["username"],
+                    "image": r["node"]["thumbnail_src"],
+                    "timestamp": r["node"]["taken_at_timestamp"],
+                    'permalink': r["node"]["display_url"],
+                    'caption': r["node"]["edge_media_to_caption"]["edges"][0]["node"]["text"],
+                    'shortcode': r["node"]["shortcode"]
+                })
+    return media
 
-def create_file(file_name, file_content):
-    f = open(file_name, 'wb')
-    f.write(file_content)
-    f.close()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--users', '-u', nargs='+', help='Users to scrape images from')
+    parser.add_argument('--output', '-o', help='Output file', required=True)
+    args = parser.parse_args()
+    assert args.users, "Enter users to scrape! Use --tags option, see help."
+    all_media = []
+    for user in args.users:
+        all_media.extend(get_media(user))
+    sorted_media = sorted(all_media, key=operator.itemgetter('timestamp'), reverse=True)
+    sorted_media = sorted_media[:200]
+    with open(args.output, 'w') as f:
+        f.write(json.dumps(sorted_media))
 
 
-
-users = ["oanunoby", "officialzobrown", "brunofive", "demar_derozan", "sergeibaka7", "kyle_lowry7", "_alvo_", "masfresco", "bebe92official", "jakob", "normanpowell4", "pskills43", "jvalanciunas", "fredvanvleet", "delonwright", "raptors", "raptors905"]
-
-all_media = []
-for u in users:
-    try:
-      soup = BeautifulSoup(requests.get("http://www.instagram.com/" + u).text, "html.parser")
-      scripts = soup.find_all("script")
-      for script in scripts:
-          if "window._sharedData" in script.string:
-              data = json.loads(script.get_text()[:-1].split("window._sharedData = ")[1])
-              recent_media = data["entry_data"]["ProfilePage"][0]["user"]["media"]["nodes"]
-              for r in recent_media:
-                  r["user"] = data["entry_data"]["ProfilePage"][0]["user"]
-                  r['time'] = time.strftime('%b %d, %Y', time.localtime(r['date']))
-              all_media.extend(recent_media)
-    except Exception as e:
-      continue
-sorted_media = sorted(all_media, key=itemgetter('date'), reverse=True)
-sorted_media = sorted_media[:200]
-info = {'bits': sorted_media}
-template = Template(read_file('./insta.html'))
-print(template.render(info).encode("utf-8"))
