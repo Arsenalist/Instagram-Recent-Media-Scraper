@@ -4,6 +4,8 @@ import json
 from requests_html import HTMLSession
 import operator
 import requests
+import time
+import random
 
 def get_media(user):
     ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
@@ -23,10 +25,7 @@ def get_media(user):
     scripts = req.html.xpath('//script[@type]')    
     for s in scripts:
         content = s.text
-        print (s.text)
-        print ("dude")
         if "csrf_token" in content:
-            print ("dd")
             content = content[:-1].split("window._sharedData = ")[1]      
             data = json.loads(content)     
             recent_media = data["entry_data"]["ProfilePage"][0]["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"]
@@ -39,7 +38,6 @@ def get_media(user):
                     'caption': r["node"]["edge_media_to_caption"]["edges"][0]["node"]["text"],
                     'shortcode': r["node"]["shortcode"]
                 })
-            print (media)
     return media
 
 if __name__ == '__main__':
@@ -51,6 +49,7 @@ if __name__ == '__main__':
     all_media = []
     for user in args.users:
         all_media.extend(get_media(user))
+        time.sleep(random.randint(1, 15))
     sorted_media = sorted(all_media, key=operator.itemgetter('timestamp'), reverse=True)
     sorted_media = sorted_media[:200]
     with open(args.output, 'w') as f:
